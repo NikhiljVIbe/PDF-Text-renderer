@@ -1,73 +1,134 @@
-# React + TypeScript + Vite
+# PDF Text Renderer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A browser-based tool that takes raw, unformatted text extracted from any PDF parser and intelligently reformats it into a clean, readable document. It auto-detects 9 structural block types — headings, tables, lists, blockquotes, footnotes, and more — and renders each with publication-quality styling.
 
-Currently, two official plugins are available:
+![React](https://img.shields.io/badge/React-19-blue)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
+![Vite](https://img.shields.io/badge/Vite-7-purple)
+![License](https://img.shields.io/badge/License-MIT-green)
+![No External CSS](https://img.shields.io/badge/CSS_Libraries-None-orange)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## What It Does
 
-## React Compiler
+- **Paste** raw text output from any PDF parser (pdfplumber, PyMuPDF, pdf.js, etc.) into the textarea
+- **Click Run** to get a formatted, readable document instantly
+- **Auto-detects** structural elements: headings, tables, lists, blockquotes, footnotes, metadata, exhibit headers, and page markers
+- **Runs entirely in the browser** — no backend, no data leaves your machine
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Detected Block Types
 
-## Expanding the ESLint configuration
+| Block Type | What It Detects | Rendered As |
+|---|---|---|
+| **Heading** | ALL-CAPS or Title Case short lines without terminal punctuation | `<h1>` / `<h2>` / `<h3>` (auto-leveled) |
+| **Paragraph** | Body text (default fallback) | Justified text with comfortable line-height |
+| **Table** | Lines with 3+ columns separated by multiple spaces | HTML `<table>` with header row and borders |
+| **List** | Unordered (`-` `*`), numeric (`1.`), roman (`i.`), alpha (`a.`) | `<ul>` or `<ol>` (auto-detected) |
+| **Blockquote** | Quoted text with optional `— Author` attribution | Styled `<blockquote>` with gold border |
+| **Exhibit Header** | "Exhibit 1:", "Figure 3:", "Table 2:", "Appendix A" | Bold section header with borders |
+| **Metadata** | Author names, institutions, copyright, dates | Centered italic text |
+| **Footnote** | Numbered notes in the last ~25% of the document | Superscript-numbered hanging-indent notes |
+| **Page Marker** | PDF headers/footers with document IDs, lone page numbers | Hidden by default |
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Getting Started
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Prerequisites
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- Node.js 18+ and npm
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Installation
+
+```bash
+git clone https://github.com/NikhiljVIbe/PDF-Text-renderer.git
+cd PDF-Text-renderer
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Running
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+### Available Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start dev server (port 5173) |
+| `npm run build` | Production build (TypeScript check + Vite bundle) |
+| `npm run preview` | Preview the production build |
+| `npm run lint` | Run ESLint |
+
+## How It Works
+
+The parser uses a **3-stage pipeline** to transform raw text into structured blocks:
+
+### 1. Normalize (`normalizeText`)
+
+Raw PDF text often arrives as a wall of lines with no blank lines between sections. The normalizer applies 12 heuristic rules to insert blank-line boundaries at structural transitions — headings, tables, lists, blockquotes, page markers, and more. If the input already has sufficient blank lines (5%+), this step is bypassed entirely.
+
+### 2. Chunk (`splitIntoChunks`)
+
+The normalized text is split into groups of consecutive non-empty lines, separated by blank lines. Each group becomes a candidate structural block.
+
+### 3. Classify & Render (`classifyChunk` + `renderBlock`)
+
+Each chunk runs through a priority-ordered detection chain (page markers checked first, paragraph as fallback). The classified blocks are then rendered as semantic HTML with inline styles.
+
+```
+Raw PDF text
+     |
+     v
+normalizeText()    -- insert blank-line boundaries (12 rules)
+     |
+     v
+splitIntoChunks()  -- group consecutive non-empty lines
+     |
+     v
+classifyChunk()    -- priority-ordered 9-type detection
+     |
+     v
+renderBlock()      -- semantic HTML + inline styles
+     |
+     v
+Formatted document
+```
+
+## Project Structure
+
+```
+src/
+  App.tsx                              -- Split-pane UI: textarea input + formatted output
+  main.tsx                             -- Entry point
+  components/PdfTextRenderer/
+    types.ts                           -- BlockType union + ParsedBlock interface
+    parser.ts                          -- normalizeText + splitIntoChunks + parseText
+    classifyChunk.ts                   -- Priority-ordered 9-type classifier
+    blockRenderers.tsx                 -- Render function per block type (semantic HTML)
+    PdfTextRenderer.tsx                -- Main React component (useMemo-optimized)
+    index.ts                           -- Barrel exports
+  data/
+    sampleText.ts                      -- Preloaded sample (ISB case study)
+```
+
+## Tech Stack
+
+- **React 19** — Functional components with hooks
+- **TypeScript 5.9** — Strict mode
+- **Vite 7** — Dev server and production builds
+- **Zero external CSS or UI libraries** — All styling via inline `React.CSSProperties`
+- **No backend** — Runs entirely in the browser
+- **Semantic HTML** — Proper `<h1>`-`<h3>`, `<ul>`/`<ol>`, `<blockquote>`, `<table>` elements
+
+## Design Decisions
+
+- **Inline styles over CSS files** — Keeps the component self-contained and portable with no class name conflicts or external dependencies
+- **`const as const` over `enum`** — Required by TypeScript's `erasableSyntaxOnly` config setting
+- **Fast-path normalization bypass** — Text with 5%+ blank lines is assumed to already have structure, skipping unnecessary processing
+- **`useMemo` for parsing** — The `parseText` function is memoized on the input text, so re-renders that don't change the text skip the entire pipeline
+- **Priority-ordered classification** — Block types are checked in a fixed order (page marker first, paragraph last) so more specific patterns always win
+
+## License
+
+[MIT](LICENSE)
